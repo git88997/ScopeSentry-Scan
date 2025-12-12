@@ -121,6 +121,44 @@ func (r *request) HttpGetByte(uri string) ([]byte, error) {
 	return tmp, nil
 }
 
+func fixJSONNewlines(b []byte) []byte {
+	var out []byte
+	inString := false
+	escaped := false
+
+	for i := 0; i < len(b); i++ {
+		c := b[i]
+
+		if escaped {
+			out = append(out, c)
+			escaped = false
+			continue
+		}
+
+		if c == '\\' {
+			escaped = true
+			out = append(out, c)
+			continue
+		}
+
+		if c == '"' {
+			inString = !inString
+			out = append(out, c)
+			continue
+		}
+
+		if inString && (c == '\n' || c == '\r') {
+			// 转义换行
+			out = append(out, '\\', 'n')
+			continue
+		}
+
+		out = append(out, c)
+	}
+
+	return out
+}
+
 func (r *request) HttpPost(uri string, requestBody []byte, ct string) (error, HttpResponse) {
 	req, resp := fasthttp.AcquireRequest(), fasthttp.AcquireResponse()
 	defer func() {
@@ -131,6 +169,7 @@ func (r *request) HttpPost(uri string, requestBody []byte, ct string) (error, Ht
 	req.SetRequestURI(uri)
 	if ct == "json" {
 		req.Header.Set("Content-Type", "application/json")
+		requestBody = fixJSONNewlines(requestBody)
 	}
 	req.SetBody(requestBody)
 

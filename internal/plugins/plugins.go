@@ -49,22 +49,22 @@ func NewPluginManager() *PluginManager {
 	}
 }
 
-func (pm *PluginManager) RegisterPlugin(module string, name string, plugin interfaces.Plugin) {
+func (pm *PluginManager) RegisterPlugin(module string, id string, plugin interfaces.Plugin) {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 
 	if _, exists := pm.plugins[module]; !exists {
 		pm.plugins[module] = make(map[string]interfaces.Plugin)
 	}
-	pm.plugins[module][name] = plugin
+	pm.plugins[module][id] = plugin
 }
 
-func (pm *PluginManager) GetPlugin(module, name string) (interfaces.Plugin, bool) {
+func (pm *PluginManager) GetPlugin(module, id string) (interfaces.Plugin, bool) {
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
 
 	if modPlugins, ok := pm.plugins[module]; ok {
-		plugin, ok := modPlugins[name]
+		plugin, ok := modPlugins[id]
 		if ok {
 			return plugin.Clone(), ok // 返回新实例
 		} else {

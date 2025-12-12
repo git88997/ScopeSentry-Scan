@@ -314,6 +314,10 @@ func (p *Plugin) Execute(input interface{}) (interface{}, error) {
 			if optimized, err := utils.Tools.ReadFileToStringOptimized(path); err == nil {
 				katanaResult.Response.Body = optimized
 			} else {
+				//if !errors.Is(err, os.ErrNotExist) {
+				//	// 非文件不存在的错误才打印日志
+				//	logger.SlogWarnLocal(fmt.Sprintf("Read file failed: %s, error: %v", path, err))
+				//}
 				logger.SlogWarnLocal(fmt.Sprintf("Read file failed: %s, error: %v", path, err))
 			}
 

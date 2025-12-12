@@ -279,7 +279,6 @@ type HttpResponse struct {
 }
 
 type NotificationConfig struct {
-	SubdomainScan                 bool   `bson:"subdomainScan"`
 	DirScanNotification           bool   `bson:"dirScanNotification"`
 	PortScanNotification          bool   `bson:"portScanNotification"`
 	SensitiveNotification         bool   `bson:"sensitiveNotification"`

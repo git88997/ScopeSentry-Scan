@@ -9,6 +9,7 @@ package wayback
 
 import (
 	"bytes"
+	"compress/gzip"
 	"errors"
 	"fmt"
 	"github.com/Autumn-27/ScopeSentry-Scan/internal/contextmanager"
@@ -224,10 +225,21 @@ func (p *Plugin) Execute(input interface{}) (interface{}, error) {
 
 						r.Status = response.StatusCode
 
+						var reader io.Reader = response.Body
+						if response.Header.Get("Content-Encoding") == "gzip" {
+							gzipReader, err := gzip.NewReader(response.Body)
+							if err != nil {
+								logger.SlogWarnLocal(fmt.Sprintf("gzip reader error: %v", err))
+							} else {
+								defer gzipReader.Close()
+								reader = gzipReader
+							}
+						}
+
 						var buf bytes.Buffer
 						tmp := make([]byte, 64*1024) // 每次读取 64KB
 						for {
-							n, err := response.Body.Read(tmp)
+							n, err := reader.Read(tmp)
 							if n > 0 {
 								buf.Write(tmp[:n])
 							}

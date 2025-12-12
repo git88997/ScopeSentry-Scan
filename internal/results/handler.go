@@ -68,7 +68,7 @@ func (h *handler) Subdomain(result *types.SubdomainResult) {
 	}
 	result.Project = h.GetAssetProject(rootDomain)
 	interfaceSlice = &result
-	if global.NotificationConfig.SubdomainScan {
+	if global.NotificationConfig.SubdomainNotification {
 		NotificationMsg := fmt.Sprintf("%v - %v\n", result.Host, result.IP)
 		notification.NotificationQueues["SubdomainScan"].Queue <- NotificationMsg
 	}

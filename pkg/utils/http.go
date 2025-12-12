@@ -9,6 +9,7 @@ package utils
 
 import (
 	"bytes"
+	"compress/gzip"
 	"crypto/tls"
 	"fmt"
 	"github.com/Autumn-27/ScopeSentry-Scan/internal/types"
@@ -192,9 +193,20 @@ func (n *Nethttp) HttpGetWithCustomHeader(uri string, customHeaders map[string]s
 	tmp := types.HttpResponse{}
 	tmp.Url = uri
 
+	var reader io.Reader = resp.Body
+	if resp.Header.Get("Content-Encoding") == "gzip" {
+		gzipReader, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			logger.SlogErrorLocal(fmt.Sprintf("gzip reader error: %v", err))
+		} else {
+			defer gzipReader.Close()
+			reader = gzipReader
+		}
+	}
+
 	// 限制最大响应体大小（10MB）
 	const maxBodySize = 10 * 1024 * 1024 // 10MB
-	limitedReader := io.LimitReader(resp.Body, maxBodySize)
+	limitedReader := io.LimitReader(reader, maxBodySize)
 
 	// 读取响应体
 	bodyBytes, err := io.ReadAll(limitedReader)
@@ -241,9 +253,20 @@ func (n *Nethttp) HttpPostWithCustomHeader(uri string, requestBody []byte, ct st
 	}
 	defer resp.Body.Close()
 
+	var reader io.Reader = resp.Body
+	if resp.Header.Get("Content-Encoding") == "gzip" {
+		gzipReader, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			logger.SlogErrorLocal(fmt.Sprintf("gzip reader error: %v", err))
+		} else {
+			defer gzipReader.Close()
+			reader = gzipReader
+		}
+	}
+
 	// 限制最大响应体大小（10MB）
 	const maxBodySize = 10 * 1024 * 1024 // 10MB
-	limitedReader := io.LimitReader(resp.Body, maxBodySize)
+	limitedReader := io.LimitReader(reader, maxBodySize)
 
 	// 读取响应体
 	bodyBytes, err := io.ReadAll(limitedReader)
