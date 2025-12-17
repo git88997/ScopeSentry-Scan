@@ -1054,24 +1054,24 @@ var builderPool = sync.Pool{
 }
 
 func (t *UtilTools) ReadFileToStringOptimized(filePath string) (string, error) {
-	file, err := os.Open(filePath)
+	f, err := os.Open(filePath)
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer f.Close()
 
-	builder := builderPool.Get().(*strings.Builder)
-	builder.Reset()
-	defer builderPool.Put(builder)
+	const maxSize = 30 << 20 // 30MB
 
-	// 使用缓冲区
-	buf := make([]byte, 64*1024) // 64KB 缓冲区
-	_, err = io.CopyBuffer(builder, file, buf)
+	// 只允许读取前 30MB
+	r := io.LimitReader(f, maxSize)
+
+	data, err := io.ReadAll(r)
 	if err != nil {
 		return "", err
 	}
 
-	return builder.String(), nil
+	// 转为 string（必然一次拷贝）
+	return string(data), nil
 }
 
 func (t *UtilTools) CdnCheck(host string) (bool, string) {
