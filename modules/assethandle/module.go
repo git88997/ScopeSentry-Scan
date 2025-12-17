@@ -9,6 +9,9 @@ package assethandle
 
 import (
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/Autumn-27/ScopeSentry-Scan/internal/contextmanager"
 	"github.com/Autumn-27/ScopeSentry-Scan/internal/handler"
 	"github.com/Autumn-27/ScopeSentry-Scan/internal/interfaces"
@@ -20,8 +23,6 @@ import (
 	"github.com/Autumn-27/ScopeSentry-Scan/pkg/logger"
 	"github.com/Autumn-27/ScopeSentry-Scan/pkg/utils"
 	"go.mongodb.org/mongo-driver/bson"
-	"sync"
-	"time"
 )
 
 type Runner struct {

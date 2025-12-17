@@ -299,6 +299,7 @@ func (p *Plugin) Execute(input interface{}) (interface{}, error) {
 	urlFilePath := filepath.Join(global.TmpDir, filename)
 	urlNumber := 0
 	params := make(map[string]map[string]struct{})
+	visited := make(map[string]struct{}, 100000)
 	for result := range resultChan {
 		var katanaResult types.KatanaResult
 		err = sonic.Unmarshal(result, &katanaResult)
@@ -306,6 +307,11 @@ func (p *Plugin) Execute(input interface{}) (interface{}, error) {
 			logger.SlogWarnLocal(fmt.Sprintf("JSON parse error: %v", err))
 			continue
 		}
+		url := katanaResult.Request.URL
+		if _, ok := visited[url]; ok {
+			continue
+		}
+		visited[url] = struct{}{}
 		// 确保 Response 不为 nil
 		if katanaResult.Response != nil && katanaResult.Response.StoredResponseBodyPath != "" {
 			path := katanaResult.Response.StoredResponseBodyPath
@@ -318,10 +324,11 @@ func (p *Plugin) Execute(input interface{}) (interface{}, error) {
 				//	// 非文件不存在的错误才打印日志
 				//	logger.SlogWarnLocal(fmt.Sprintf("Read file failed: %s, error: %v", path, err))
 				//}
-				logger.SlogWarnLocal(fmt.Sprintf("Read file failed: %s, error: %v", path, err))
+				logger.SlogWarnLocal(fmt.Sprintf("url:%v Read file failed: %s, error: %v", katanaResult.Request.URL, path, err))
 			}
 
 			// 删除临时文件（若失败仅警告）
+			fmt.Printf("Target: %v ---url %v  --- delete: %v\n", data.URL, katanaResult.Request.URL, path)
 			utils.Tools.DeleteFile(path)
 		} else {
 			// 没有 Response 或路径为空

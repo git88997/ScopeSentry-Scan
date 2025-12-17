@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"github.com/Autumn-27/ScopeSentry-Scan/internal/global"
 	"github.com/Autumn-27/ScopeSentry-Scan/internal/interfaces"
+	"github.com/Autumn-27/ScopeSentry-Scan/internal/mongodb"
 	"github.com/Autumn-27/ScopeSentry-Scan/internal/redis"
 	"github.com/Autumn-27/ScopeSentry-Scan/modules/assethandle/webfingerprint"
 	"github.com/Autumn-27/ScopeSentry-Scan/modules/assetmapping/httpx"
@@ -31,7 +32,10 @@ import (
 	"github.com/Autumn-27/ScopeSentry-Scan/modules/vulnerabilityscan/nuclei"
 	"github.com/Autumn-27/ScopeSentry-Scan/modules/webcrawler/rad"
 	"github.com/Autumn-27/ScopeSentry-Scan/pkg/logger"
+	"github.com/Autumn-27/ScopeSentry-Scan/pkg/utils"
 	"github.com/cloudflare/cfssl/log"
+	"go.mongodb.org/mongo-driver/bson"
+	"path/filepath"
 	"sync"
 )
 
@@ -68,10 +72,51 @@ func (pm *PluginManager) GetPlugin(module, id string) (interfaces.Plugin, bool) 
 		if ok {
 			return plugin.Clone(), ok // 返回新实例
 		} else {
-			return nil, false
+			// 插件未注册成功
+			plg, err := LoadCustomPlugin(filepath.Join(global.PluginDir, module, id, ".go"), module, id)
+			if err != nil {
+				err = LoadPlugFromDB(id)
+				if err != nil {
+					logger.SlogErrorLocal(err.Error())
+					return nil, false
+				}
+				plg, err = LoadCustomPlugin(filepath.Join(global.PluginDir, module, id, ".go"), module, id)
+				if err != nil {
+					logger.SlogErrorLocal(err.Error())
+					return nil, false
+				}
+			}
+			pm.RegisterPlugin(module, id, plg)
+			err = plg.Install()
+			if err != nil {
+				logger.SlogErrorLocal(err.Error())
+				return nil, false
+			}
+			return plg.Clone(), true
 		}
 	}
 	return nil, false
+}
+
+type PluginInfo struct {
+	Module string `bson:"module"`
+	Hash   string `bson:"hash"`
+	Source string `bson:"source"`
+}
+
+func LoadPlugFromDB(hash string) error {
+	var result PluginInfo
+	err := mongodb.MongodbClient.FindOne("plugins", bson.M{"hash": hash}, bson.M{"module": 1, "hash": 1, "source": 1}, &result)
+	if err != nil {
+		return fmt.Errorf("find plugin error: %v", err)
+	}
+	plgPath := filepath.Join(global.PluginDir, result.Module, fmt.Sprintf("%v.go", result.Hash))
+	err = utils.Tools.WriteContentFile(plgPath, result.Source)
+	if err != nil {
+		return fmt.Errorf("WriteContentFile plugin error: %v", err)
+	}
+	logger.SlogInfoLocal(fmt.Sprintf("write plugin end:%v", hash))
+	return nil
 }
 
 // InitializePlugins 初始化插件
