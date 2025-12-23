@@ -9,6 +9,7 @@ package assethandle
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -140,7 +141,16 @@ func (r *Runner) ModuleRun() error {
 							Port: dataTmp.Port,
 							IP:   dataTmp.IP,
 						}
-						httpAssetHandle(tmp)
+						if r.Option.Type == "assetSource" || r.Option.Type == "asset" {
+							if tmp.URL == "" {
+								tmp.URL = dataTmp.Service + "://" + dataTmp.Host + ":" + dataTmp.Port
+								tmp.URL = strings.ReplaceAll(strings.ReplaceAll(tmp.URL, ":80", ""), ":443", "")
+							}
+						}
+						if len(r.Option.AssetMapping) != 0 {
+							// 如果是0 说明没有开启httpx资产测绘 说明是从资产处创建的任务
+							httpAssetHandle(tmp)
+						}
 						assetHttpArray = append(assetHttpArray, tmp)
 						continue
 					}

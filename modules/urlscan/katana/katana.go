@@ -328,7 +328,6 @@ func (p *Plugin) Execute(input interface{}) (interface{}, error) {
 			}
 
 			// 删除临时文件（若失败仅警告）
-			fmt.Printf("Target: %v ---url %v  --- delete: %v\n", data.URL, katanaResult.Request.URL, path)
 			utils.Tools.DeleteFile(path)
 		} else {
 			// 没有 Response 或路径为空
