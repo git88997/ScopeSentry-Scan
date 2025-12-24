@@ -8,6 +8,7 @@
 package notification
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/Autumn-27/ScopeSentry-Scan/internal/global"
 	"github.com/Autumn-27/ScopeSentry-Scan/pkg/logger"
@@ -77,8 +78,14 @@ func processBatch(module string, mq *NotificationQueue) {
 	}
 }
 
+func jsonEscape(s string) string {
+	b, _ := json.Marshal(s)
+	return string(b[1 : len(b)-1])
+}
+
 // FlushBuffer 模拟处理队列中的数据
 func FlushBuffer(module string, buffer *string) {
+	*buffer = jsonEscape(*buffer)
 	// 处理消息
 	*buffer = "[" + global.AppConfig.NodeName + "][" + module + "]results:\n" + *buffer
 	for _, api := range global.NotificationApi {
