@@ -9,13 +9,12 @@ package webfingerprint
 
 import (
 	"fmt"
-	"strings"
-	"sync"
-
 	"github.com/Autumn-27/ScopeSentry-Scan/internal/global"
 	"github.com/Autumn-27/ScopeSentry-Scan/internal/interfaces"
 	"github.com/Autumn-27/ScopeSentry-Scan/internal/types"
 	"github.com/Autumn-27/ScopeSentry-Scan/pkg/logger"
+	"strings"
+	"sync"
 )
 
 type Plugin struct {
@@ -130,7 +129,6 @@ func (p *Plugin) Execute(input interface{}) (interface{}, error) {
 		return nil, nil
 	}
 	acMatcher := global.WebFingers.ACMatcher
-
 	var mu sync.Mutex
 	var matchFingers = []*types.Fingerprint{}
 	// 新版本
