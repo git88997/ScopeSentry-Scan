@@ -29,7 +29,8 @@ var (
 	ExtDir                string
 	SensitiveRules        []types.SensitiveRule
 	Projects              []types.Project
-	WebFingers            []types.WebFinger
+	WebFingers            *types.WebFingerCore
+	NucleiFlag            map[string][]string
 	NotificationApi       []types.NotificationApi
 	NotificationConfig    types.NotificationConfig
 	PocDir                string

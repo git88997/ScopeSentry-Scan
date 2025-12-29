@@ -21,35 +21,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Fingerprint 指纹定义
-type Fingerprint struct {
-	Name  string `yaml:"name"`
-	Rules []Rule `yaml:"rules"`
-}
-
-// Rule 规则定义
-type Rule struct {
-	Logic      string      `yaml:"logic"` // AND 或 OR
-	Conditions []Condition `yaml:"conditions"`
-}
-
-// Condition 条件定义（支持普通条件和嵌套条件组）
-type Condition struct {
-	// 普通条件字段
-	Location    string `yaml:"location,omitempty"`   // body, header, title, request
-	MatchType   string `yaml:"match_type,omitempty"` // regex, contains, extract, active
-	Pattern     string `yaml:"pattern,omitempty"`
-	Group       int    `yaml:"group,omitempty"`
-	SaveAs      string `yaml:"save_as,omitempty"`
-	Path        string `yaml:"path,omitempty"`
-	DynamicPath string `yaml:"dynamic_path,omitempty"`
-	Method      string `yaml:"method,omitempty"`
-
-	// 嵌套条件组字段
-	Logic      string      `yaml:"logic,omitempty"`      // AND 或 OR（用于嵌套组）
-	Conditions []Condition `yaml:"conditions,omitempty"` // 子条件或嵌套组
-}
-
 // HTTPResponse HTTP响应数据
 type HTTPResponse struct {
 	URL        string
@@ -67,14 +38,14 @@ type MatchContext struct {
 }
 
 // LoadFingerprint 加载YAML指纹文件
-func LoadFingerprint(filepath string) (*Fingerprint, error) {
+func LoadFingerprint(filepath string) (*types.Fingerprint, error) {
 	data, err := os.ReadFile(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read fingerprint file: %w", err)
 	}
 
 	// 如果没有fingerprint包装，直接解析为Fingerprint结构
-	var fingerprint Fingerprint
+	var fingerprint types.Fingerprint
 	if err := yaml.Unmarshal(data, &fingerprint); err != nil {
 		return nil, fmt.Errorf("failed to parse YAML: %w", err)
 	}
@@ -119,7 +90,7 @@ func NewMatchContext() *MatchContext {
 }
 
 // MatchFingerprint 匹配指纹
-func MatchFingerprint(fingerprint *Fingerprint, asset *types.AssetHttp) (bool, error) {
+func MatchFingerprint(fingerprint *types.Fingerprint, asset *types.AssetHttp) (bool, error) {
 	ctx := NewMatchContext()
 
 	// 规则之间是OR关系，任一规则匹配成功即可
@@ -137,7 +108,7 @@ func MatchFingerprint(fingerprint *Fingerprint, asset *types.AssetHttp) (bool, e
 }
 
 // evaluateRule 评估规则
-func evaluateRule(rule Rule, ctx *MatchContext, baseResponse *types.AssetHttp) (bool, error) {
+func evaluateRule(rule types.Rule, ctx *MatchContext, baseResponse *types.AssetHttp) (bool, error) {
 	// 为每个规则创建新的变量作用域（规则之间变量不共享）
 	ctx.Variables = make(map[string]string)
 
@@ -170,7 +141,7 @@ func evaluateRule(rule Rule, ctx *MatchContext, baseResponse *types.AssetHttp) (
 }
 
 // evaluateCondition 评估条件（递归处理嵌套条件组）
-func evaluateCondition(condition Condition, ctx *MatchContext, baseResponse *types.AssetHttp) (bool, error) {
+func evaluateCondition(condition types.Condition, ctx *MatchContext, baseResponse *types.AssetHttp) (bool, error) {
 	// 判断是否为嵌套条件组
 	if isConditionGroup(condition) {
 		return evaluateConditionGroup(condition, ctx, baseResponse)
@@ -181,12 +152,12 @@ func evaluateCondition(condition Condition, ctx *MatchContext, baseResponse *typ
 }
 
 // isConditionGroup 判断是否为嵌套条件组
-func isConditionGroup(condition Condition) bool {
+func isConditionGroup(condition types.Condition) bool {
 	return condition.Logic != "" && condition.Location == ""
 }
 
 // evaluateConditionGroup 评估嵌套条件组
-func evaluateConditionGroup(condition Condition, ctx *MatchContext, baseResponse *types.AssetHttp) (bool, error) {
+func evaluateConditionGroup(condition types.Condition, ctx *MatchContext, baseResponse *types.AssetHttp) (bool, error) {
 	// 根据logic进行短路求值优化
 	if condition.Logic == "AND" {
 		// AND逻辑：遇到第一个false就立即返回false
@@ -216,7 +187,7 @@ func evaluateConditionGroup(condition Condition, ctx *MatchContext, baseResponse
 }
 
 // evaluateNormalCondition 评估普通条件
-func evaluateNormalCondition(condition Condition, ctx *MatchContext, baseResponse *types.AssetHttp) (bool, error) {
+func evaluateNormalCondition(condition types.Condition, ctx *MatchContext, baseResponse *types.AssetHttp) (bool, error) {
 	switch condition.MatchType {
 	case "regex":
 		return matchRegex(condition, ctx, baseResponse)
@@ -261,7 +232,7 @@ func formatHeaders(headers map[string]string) string {
 }
 
 // matchRegex 正则表达式匹配
-func matchRegex(condition Condition, ctx *MatchContext, baseResponse *types.AssetHttp) (bool, error) {
+func matchRegex(condition types.Condition, ctx *MatchContext, baseResponse *types.AssetHttp) (bool, error) {
 	data := getDataByLocation(condition.Location, baseResponse)
 	if data == "" {
 		return false, nil
@@ -276,7 +247,7 @@ func matchRegex(condition Condition, ctx *MatchContext, baseResponse *types.Asse
 }
 
 // matchContains 字符串包含匹配
-func matchContains(condition Condition, ctx *MatchContext, baseResponse *types.AssetHttp) (bool, error) {
+func matchContains(condition types.Condition, ctx *MatchContext, baseResponse *types.AssetHttp) (bool, error) {
 	data := getDataByLocation(condition.Location, baseResponse)
 	if data == "" {
 		return false, nil
@@ -286,7 +257,7 @@ func matchContains(condition Condition, ctx *MatchContext, baseResponse *types.A
 }
 
 // matchNotContains 字符串不包含匹配
-func matchNotContains(condition Condition, ctx *MatchContext, baseResponse *types.AssetHttp) (bool, error) {
+func matchNotContains(condition types.Condition, ctx *MatchContext, baseResponse *types.AssetHttp) (bool, error) {
 	data := getDataByLocation(condition.Location, baseResponse)
 	if data == "" {
 		return true, nil // 如果数据为空，认为不包含
@@ -296,7 +267,7 @@ func matchNotContains(condition Condition, ctx *MatchContext, baseResponse *type
 }
 
 // matchExtract 提取并保存变量
-func matchExtract(condition Condition, ctx *MatchContext, baseResponse *types.AssetHttp) (bool, error) {
+func matchExtract(condition types.Condition, ctx *MatchContext, baseResponse *types.AssetHttp) (bool, error) {
 	data := getDataByLocation(condition.Location, baseResponse)
 	if data == "" {
 		return false, nil
@@ -335,7 +306,7 @@ func matchExtract(condition Condition, ctx *MatchContext, baseResponse *types.As
 }
 
 // matchActive 主动发送HTTP请求
-func matchActive(condition Condition, ctx *MatchContext, baseResponse *types.AssetHttp) (bool, error) {
+func matchActive(condition types.Condition, ctx *MatchContext, baseResponse *types.AssetHttp) (bool, error) {
 	// 确定请求URL
 	var requestURL string
 	if condition.DynamicPath != "" {
@@ -373,7 +344,7 @@ func matchActive(condition Condition, ctx *MatchContext, baseResponse *types.Ass
 }
 
 // evaluateActiveSubConditions 评估主动请求的子条件
-func evaluateActiveSubConditions(condition Condition, response *types.AssetHttp, ctx *MatchContext) bool {
+func evaluateActiveSubConditions(condition types.Condition, response *types.AssetHttp, ctx *MatchContext) bool {
 	if len(condition.Conditions) == 0 {
 		// 没有验证条件，只要请求成功就返回true
 		return response.StatusCode >= 200 && response.StatusCode < 300

@@ -22,6 +22,7 @@ import (
 	goRedis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
 )
@@ -264,27 +265,30 @@ func LoadPoc(id []string) {
 }
 
 type tmpWebFinger struct {
-	ID      primitive.ObjectID `bson:"_id"`
-	Express []string           `bson:"express"`
-	State   bool               `bson:"state"`
-	Name    string             `bson:"name"`
+	ID   primitive.ObjectID `bson:"_id"`
+	Rule string             `bson:"rule"`
 }
 
 func UpdateWebFinger() {
 	logger.SlogInfoLocal("WebFinger load begin")
 	var tmpWebF []tmpWebFinger
-	if err := mongodb.MongodbClient.FindAll("FingerprintRules", bson.M{}, bson.M{"_id": 1, "express": 1, "state": 1, "name": 1}, &tmpWebF); err != nil {
+	if err := mongodb.MongodbClient.FindAll("FingerprintRules", bson.M{}, bson.M{"_id": 1, "rule": 1}, &tmpWebF); err != nil {
 		logger.SlogErrorLocal(fmt.Sprintf("WebFinger load error: %v", err))
 		return
 	}
-	global.WebFingers = []types.WebFinger{}
+	var fingers []*types.Fingerprint
 	for _, f := range tmpWebF {
-		var wf types.WebFinger
-		wf.ID = f.ID.Hex() // 将 ObjectId 转换为字符串
-		wf.Express = f.Express
-		wf.State = f.State
-		wf.Name = f.Name
-		global.WebFingers = append(global.WebFingers, wf)
+		var tmpFinger types.Fingerprint
+		err := yaml.Unmarshal([]byte(f.Rule), &tmpFinger)
+		if err != nil {
+			logger.SlogErrorLocal(fmt.Sprintf("WebFinger unmarshal error: %v", err))
+			continue
+		}
+		fingers = append(fingers, &tmpFinger)
+	}
+	ac := BuildACMatcher(fingers)
+	global.WebFingers = &types.WebFingerCore{
+		ACMatcher: ac,
 	}
 	logger.SlogInfoLocal("WebFinger load end")
 }
