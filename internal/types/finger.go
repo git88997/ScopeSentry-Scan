@@ -20,6 +20,10 @@ type Fingerprint struct {
 	Rules          []Rule `yaml:"rules"`
 }
 
+type FingerprintYaml struct {
+	Fingerprint Fingerprint `yaml:"fingerprint"`
+}
+
 // Rule 规则定义
 type Rule struct {
 	Logic      string      `yaml:"logic"` // AND 或 OR

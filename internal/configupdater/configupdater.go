@@ -265,26 +265,28 @@ func LoadPoc(id []string) {
 }
 
 type tmpWebFinger struct {
-	ID   primitive.ObjectID `bson:"_id"`
-	Rule string             `bson:"rule"`
+	ID            primitive.ObjectID `bson:"_id"`
+	FingerprintId string             `json:"fingerprint_id" bson:"fingerprint_id"`
+	Rule          string             `bson:"rule"`
 }
 
 func UpdateWebFinger() {
 	logger.SlogInfoLocal("WebFinger load begin")
 	var tmpWebF []tmpWebFinger
-	if err := mongodb.MongodbClient.FindAll("FingerprintRules", bson.M{}, bson.M{"_id": 1, "rule": 1}, &tmpWebF); err != nil {
+	if err := mongodb.MongodbClient.FindAll("FingerprintRules", bson.M{}, bson.M{"_id": 1, "rule": 1, "fingerprint_id": 1}, &tmpWebF); err != nil {
 		logger.SlogErrorLocal(fmt.Sprintf("WebFinger load error: %v", err))
 		return
 	}
 	var fingers []*types.Fingerprint
 	for _, f := range tmpWebF {
-		var tmpFinger types.Fingerprint
+		var tmpFinger types.FingerprintYaml
 		err := yaml.Unmarshal([]byte(f.Rule), &tmpFinger)
 		if err != nil {
 			logger.SlogErrorLocal(fmt.Sprintf("WebFinger unmarshal error: %v", err))
 			continue
 		}
-		fingers = append(fingers, &tmpFinger)
+		tmpFinger.Fingerprint.ID = f.FingerprintId
+		fingers = append(fingers, &tmpFinger.Fingerprint)
 	}
 	ac := BuildACMatcher(fingers)
 	global.WebFingers = &types.WebFingerCore{

@@ -249,7 +249,7 @@ func BuildACMatcher(fingerprints []*types.Fingerprint) *types.ACMatcher {
 				// 如果任何一个rule无法提取pattern，标记为false
 				allRulesHavePattern = false
 				// 不立即break，继续检查其他rules以便调试
-				// break
+				break
 			} else {
 				allRulePatterns = append(allRulePatterns, patterns)
 			}
