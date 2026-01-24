@@ -1053,16 +1053,17 @@ var builderPool = sync.Pool{
 	},
 }
 
-func (t *UtilTools) ReadFileToStringOptimized(filePath string) (string, error) {
+func (t *UtilTools) ReadFileToStringOptimized(filePath string, maxSizeMB int64) (string, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
 		return "", err
 	}
 	defer f.Close()
 
-	const maxSize = 30 << 20 // 30MB
+	// MB 转字节
+	maxSize := maxSizeMB * 1024 * 1024
 
-	// 只允许读取前 30MB
+	// 只允许读取前 maxSizeMB MB
 	r := io.LimitReader(f, maxSize)
 
 	data, err := io.ReadAll(r)
@@ -1070,7 +1071,6 @@ func (t *UtilTools) ReadFileToStringOptimized(filePath string) (string, error) {
 		return "", err
 	}
 
-	// 转为 string（必然一次拷贝）
 	return string(data), nil
 }
 

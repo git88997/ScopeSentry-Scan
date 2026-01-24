@@ -209,8 +209,9 @@ func (p *Plugin) Execute(input interface{}) (interface{}, error) {
 	hl := false
 	xhr := false
 	pc := false
+	responseSize := 3
 	if parameter != "" {
-		args, err := utils.Tools.ParseArgs(parameter, "t", "timeout", "depth", "et", "proxy", "p", "hl", "xhr", "pc")
+		args, err := utils.Tools.ParseArgs(parameter, "t", "timeout", "depth", "et", "proxy", "p", "hl", "xhr", "pc", "rs")
 		if err != nil {
 		} else {
 			for key, value := range args {
@@ -240,6 +241,8 @@ func (p *Plugin) Execute(input interface{}) (interface{}, error) {
 						if value != "flase" {
 							pc = true
 						}
+					case "rs":
+						responseSize, _ = strconv.Atoi(value)
 					default:
 						continue
 					}
@@ -317,7 +320,7 @@ func (p *Plugin) Execute(input interface{}) (interface{}, error) {
 			path := katanaResult.Response.StoredResponseBodyPath
 
 			// 尝试读取文件内容
-			if optimized, err := utils.Tools.ReadFileToStringOptimized(path); err == nil {
+			if optimized, err := utils.Tools.ReadFileToStringOptimized(path, int64(responseSize)); err == nil {
 				katanaResult.Response.Body = optimized
 			} else {
 				//if !errors.Is(err, os.ErrNotExist) {
