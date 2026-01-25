@@ -25,12 +25,17 @@ func AcRun(testTitle, testHeader, testBody string) []*types.Fingerprint {
 
 	// 匹配title并收集指纹
 	if matcher.TitleMatcher != nil {
-		titleMatches := matcher.TitleMatcher.Match([]byte(testTitle))
-		for _, patternIndex := range titleMatches {
-			if patternIndex < len(matcher.TitlePatterns) {
-				p := matcher.TitlePatterns[patternIndex]
-				if p.Fingerprint != nil {
-					matchedFingerprintsMap[p.Fingerprint.ID] = p.Fingerprint
+		titleRune := []rune(testTitle)
+		titleMatches := matcher.TitleMatcher.MultiPatternSearch(titleRune, false)
+		for _, term := range titleMatches {
+			// 根据匹配到的Word（[]rune）找到对应的pattern索引
+			matchedPattern := string(term.Word)
+			if patternIndex, exists := matcher.TitlePatternMap[matchedPattern]; exists {
+				if patternIndex >= 0 && patternIndex < len(matcher.TitlePatterns) {
+					p := matcher.TitlePatterns[patternIndex]
+					if fp, exists := matcher.FingerprintMap[p.FingerprintID]; exists {
+						matchedFingerprintsMap[p.FingerprintID] = fp
+					}
 				}
 			}
 		}
@@ -38,12 +43,16 @@ func AcRun(testTitle, testHeader, testBody string) []*types.Fingerprint {
 
 	// 匹配header并收集指纹
 	if matcher.HeaderMatcher != nil {
-		headerMatches := matcher.HeaderMatcher.Match([]byte(testHeader))
-		for _, patternIndex := range headerMatches {
-			if patternIndex < len(matcher.HeaderPatterns) {
-				p := matcher.HeaderPatterns[patternIndex]
-				if p.Fingerprint != nil {
-					matchedFingerprintsMap[p.Fingerprint.ID] = p.Fingerprint
+		headerRune := []rune(testHeader)
+		headerMatches := matcher.HeaderMatcher.MultiPatternSearch(headerRune, false)
+		for _, term := range headerMatches {
+			matchedPattern := string(term.Word)
+			if patternIndex, exists := matcher.HeaderPatternMap[matchedPattern]; exists {
+				if patternIndex >= 0 && patternIndex < len(matcher.HeaderPatterns) {
+					p := matcher.HeaderPatterns[patternIndex]
+					if fp, exists := matcher.FingerprintMap[p.FingerprintID]; exists {
+						matchedFingerprintsMap[p.FingerprintID] = fp
+					}
 				}
 			}
 		}
@@ -51,12 +60,16 @@ func AcRun(testTitle, testHeader, testBody string) []*types.Fingerprint {
 
 	// 匹配body并收集指纹
 	if matcher.BodyMatcher != nil {
-		bodyMatches := matcher.BodyMatcher.Match([]byte(testBody))
-		for _, patternIndex := range bodyMatches {
-			if patternIndex < len(matcher.BodyPatterns) {
-				p := matcher.BodyPatterns[patternIndex]
-				if p.Fingerprint != nil {
-					matchedFingerprintsMap[p.Fingerprint.ID] = p.Fingerprint
+		bodyRune := []rune(testBody)
+		bodyMatches := matcher.BodyMatcher.MultiPatternSearch(bodyRune, false)
+		for _, term := range bodyMatches {
+			matchedPattern := string(term.Word)
+			if patternIndex, exists := matcher.BodyPatternMap[matchedPattern]; exists {
+				if patternIndex >= 0 && patternIndex < len(matcher.BodyPatterns) {
+					p := matcher.BodyPatterns[patternIndex]
+					if fp, exists := matcher.FingerprintMap[p.FingerprintID]; exists {
+						matchedFingerprintsMap[p.FingerprintID] = fp
+					}
 				}
 			}
 		}

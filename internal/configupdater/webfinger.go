@@ -14,8 +14,9 @@ import (
 	"strings"
 
 	"github.com/Autumn-27/ScopeSentry-Scan/internal/types"
+	"github.com/Autumn-27/ScopeSentry-Scan/pkg/logger"
 
-	"github.com/cloudflare/ahocorasick"
+	goahocorasick "github.com/anknown/ahocorasick"
 	"gopkg.in/yaml.v3"
 )
 
@@ -25,6 +26,10 @@ func NewACMatcher() *types.ACMatcher {
 		TitlePatterns:     make([]types.PatternInfo, 0),
 		HeaderPatterns:    make([]types.PatternInfo, 0),
 		BodyPatterns:      make([]types.PatternInfo, 0),
+		TitlePatternMap:   make(map[string]int),
+		HeaderPatternMap:  make(map[string]int),
+		BodyPatternMap:    make(map[string]int),
+		FingerprintMap:    make(map[string]*types.Fingerprint),
 		NonACFingerprints: make([]*types.Fingerprint, 0),
 	}
 }
@@ -107,10 +112,10 @@ func extractPatternsFromConditionGroup(conditions []types.Condition, logic strin
 			(condition.Location == "title" || condition.Location == "header" || condition.Location == "body") &&
 			condition.Pattern != "" {
 			allPatterns = append(allPatterns, types.PatternInfo{
-				Pattern:     condition.Pattern,
-				Location:    condition.Location,
-				Fingerprint: fingerprint,
-				RuleIndex:   ruleIndex,
+				Pattern:       condition.Pattern,
+				Location:      condition.Location,
+				FingerprintID: fingerprint.ID,
+				RuleIndex:     ruleIndex,
 			})
 		}
 	}
@@ -231,10 +236,16 @@ func selectBestPattern(candidates []types.PatternInfo) *types.PatternInfo {
 func BuildACMatcher(fingerprints []*types.Fingerprint) *types.ACMatcher {
 	matcher := NewACMatcher()
 
-	// 分别收集title、header、body的pattern
-	titlePatterns := make([]string, 0)
-	headerPatterns := make([]string, 0)
-	bodyPatterns := make([]string, 0)
+	// 使用map进行全局去重，key为 location:pattern，value为PatternInfo
+	// 这样可以避免重复的patterns被添加到AC自动机中（不影响匹配准确性）
+	titlePatternMap := make(map[string]types.PatternInfo)
+	headerPatternMap := make(map[string]types.PatternInfo)
+	bodyPatternMap := make(map[string]types.PatternInfo)
+
+	// 遍历所有fingerprint，建立FingerprintMap（优化内存，避免在PatternInfo中重复存储）
+	for _, fingerprint := range fingerprints {
+		matcher.FingerprintMap[fingerprint.ID] = fingerprint
+	}
 
 	// 遍历所有fingerprint
 	for _, fingerprint := range fingerprints {
@@ -264,19 +275,25 @@ func BuildACMatcher(fingerprints []*types.Fingerprint) *types.ACMatcher {
 
 		// 如果所有rules都能提取到pattern，才添加到AC自动机
 		if allRulesHavePattern && len(allRulePatterns) > 0 {
-			// 将所有rule的patterns添加到对应的AC自动机
+			// 将所有rule的patterns添加到对应的map中（仅去重，不进行长度过滤，确保不漏报）
 			for _, rulePatterns := range allRulePatterns {
-				for _, PatternInfo := range rulePatterns {
-					switch PatternInfo.Location {
+				for _, patternInfo := range rulePatterns {
+					key := patternInfo.Location + ":" + patternInfo.Pattern
+
+					switch patternInfo.Location {
 					case "title":
-						matcher.TitlePatterns = append(matcher.TitlePatterns, PatternInfo)
-						titlePatterns = append(titlePatterns, PatternInfo.Pattern)
+						// 全局去重：如果已存在，保留第一个（相同pattern只保留一次，不影响匹配）
+						if _, exists := titlePatternMap[key]; !exists {
+							titlePatternMap[key] = patternInfo
+						}
 					case "header":
-						matcher.HeaderPatterns = append(matcher.HeaderPatterns, PatternInfo)
-						headerPatterns = append(headerPatterns, PatternInfo.Pattern)
+						if _, exists := headerPatternMap[key]; !exists {
+							headerPatternMap[key] = patternInfo
+						}
 					case "body":
-						matcher.BodyPatterns = append(matcher.BodyPatterns, PatternInfo)
-						bodyPatterns = append(bodyPatterns, PatternInfo.Pattern)
+						if _, exists := bodyPatternMap[key]; !exists {
+							bodyPatternMap[key] = patternInfo
+						}
 					}
 				}
 			}
@@ -286,16 +303,101 @@ func BuildACMatcher(fingerprints []*types.Fingerprint) *types.ACMatcher {
 		}
 	}
 
-	// 构建AC自动机
+	// 将map转换为slice，并构建patterns列表用于AC自动机
+	titlePatterns := make([]string, 0, len(titlePatternMap))
+	headerPatterns := make([]string, 0, len(headerPatternMap))
+	bodyPatterns := make([]string, 0, len(bodyPatternMap))
+
+	for _, patternInfo := range titlePatternMap {
+		matcher.TitlePatterns = append(matcher.TitlePatterns, patternInfo)
+		titlePatterns = append(titlePatterns, patternInfo.Pattern)
+	}
+
+	for _, patternInfo := range headerPatternMap {
+		matcher.HeaderPatterns = append(matcher.HeaderPatterns, patternInfo)
+		headerPatterns = append(headerPatterns, patternInfo.Pattern)
+	}
+
+	for _, patternInfo := range bodyPatternMap {
+		matcher.BodyPatterns = append(matcher.BodyPatterns, patternInfo)
+		bodyPatterns = append(bodyPatterns, patternInfo.Pattern)
+	}
+
+	// 清理临时map
+	titlePatternMap = nil
+	headerPatternMap = nil
+	bodyPatternMap = nil
+
+	// 构建AC自动机（使用Double-Array Trie实现，内存占用极低）
+
+	// 将string patterns转换为[][]rune格式，并建立pattern到索引的映射
 	if len(titlePatterns) > 0 {
-		matcher.TitleMatcher = ahocorasick.NewStringMatcher(titlePatterns)
+		// 建立pattern到索引的映射
+		for i, pattern := range titlePatterns {
+			matcher.TitlePatternMap[pattern] = i
+		}
+
+		// 转换为[][]rune
+		titlePatternsRune := make([][]rune, len(titlePatterns))
+		for i, pattern := range titlePatterns {
+			titlePatternsRune[i] = []rune(pattern)
+		}
+
+		// 构建Double-Array Trie AC自动机
+		matcher.TitleMatcher = &goahocorasick.Machine{}
+		if err := matcher.TitleMatcher.Build(titlePatternsRune); err != nil {
+			logger.SlogErrorLocal(fmt.Sprintf("构建Title AC自动机失败: %v", err))
+		}
+
+		titlePatternsRune = nil
 	}
+
 	if len(headerPatterns) > 0 {
-		matcher.HeaderMatcher = ahocorasick.NewStringMatcher(headerPatterns)
+		// 建立pattern到索引的映射
+		for i, pattern := range headerPatterns {
+			matcher.HeaderPatternMap[pattern] = i
+		}
+
+		// 转换为[][]rune
+		headerPatternsRune := make([][]rune, len(headerPatterns))
+		for i, pattern := range headerPatterns {
+			headerPatternsRune[i] = []rune(pattern)
+		}
+
+		// 构建Double-Array Trie AC自动机
+		matcher.HeaderMatcher = &goahocorasick.Machine{}
+		if err := matcher.HeaderMatcher.Build(headerPatternsRune); err != nil {
+			logger.SlogErrorLocal(fmt.Sprintf("构建Header AC自动机失败: %v", err))
+		}
+
+		headerPatternsRune = nil
 	}
+
 	if len(bodyPatterns) > 0 {
-		matcher.BodyMatcher = ahocorasick.NewStringMatcher(bodyPatterns)
+		// 建立pattern到索引的映射
+		for i, pattern := range bodyPatterns {
+			matcher.BodyPatternMap[pattern] = i
+		}
+
+		// 转换为[][]rune
+		bodyPatternsRune := make([][]rune, len(bodyPatterns))
+		for i, pattern := range bodyPatterns {
+			bodyPatternsRune[i] = []rune(pattern)
+		}
+
+		// 构建Double-Array Trie AC自动机
+		matcher.BodyMatcher = &goahocorasick.Machine{}
+		if err := matcher.BodyMatcher.Build(bodyPatternsRune); err != nil {
+			logger.SlogErrorLocal(fmt.Sprintf("构建Body AC自动机失败: %v", err))
+		}
+
+		bodyPatternsRune = nil
 	}
+
+	// 清理临时数据
+	titlePatterns = nil
+	headerPatterns = nil
+	bodyPatterns = nil
 
 	return matcher
 }

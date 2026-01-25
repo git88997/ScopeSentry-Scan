@@ -7,7 +7,7 @@
 
 package types
 
-import "github.com/cloudflare/ahocorasick"
+import goahocorasick "github.com/anknown/ahocorasick"
 
 // Fingerprint 指纹定义
 type Fingerprint struct {
@@ -48,10 +48,10 @@ type Condition struct {
 }
 
 type PatternInfo struct {
-	Pattern     string       // pattern字符串
-	Location    string       // title, header, body
-	Fingerprint *Fingerprint // 关联的fingerprint
-	RuleIndex   int          // 关联的rule索引
+	Pattern      string // pattern字符串
+	Location     string // title, header, body
+	FingerprintID string // 关联的fingerprint ID（优化内存，避免重复存储Fingerprint指针）
+	RuleIndex    int    // 关联的rule索引
 }
 
 type WebFingerCore struct {
@@ -59,12 +59,18 @@ type WebFingerCore struct {
 }
 
 type ACMatcher struct {
-	TitleMatcher   *ahocorasick.Matcher
-	HeaderMatcher  *ahocorasick.Matcher
-	BodyMatcher    *ahocorasick.Matcher
+	TitleMatcher   *goahocorasick.Machine
+	HeaderMatcher  *goahocorasick.Machine
+	BodyMatcher    *goahocorasick.Machine
 	TitlePatterns  []PatternInfo
 	HeaderPatterns []PatternInfo
 	BodyPatterns   []PatternInfo
+	// Pattern到索引的映射（用于根据匹配结果找到PatternInfo）
+	TitlePatternMap  map[string]int  // pattern字符串 -> PatternInfo索引
+	HeaderPatternMap map[string]int
+	BodyPatternMap   map[string]int
+	// Fingerprint ID到Fingerprint的映射（优化内存，避免在PatternInfo中重复存储）
+	FingerprintMap map[string]*Fingerprint // fingerprintID -> Fingerprint
 	// 无法使用AC自动机的fingerprint列表
 	NonACFingerprints []*Fingerprint
 }

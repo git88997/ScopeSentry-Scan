@@ -54,6 +54,7 @@ require github.com/spaolacci/murmur3 v1.1.0 // indirect
 
 require (
 	github.com/allegro/bigcache/v3 v3.1.0
+	github.com/anknown/ahocorasick v0.0.0-20190904063843-d75dbd5169c0
 	github.com/bytedance/sonic v1.14.1
 	github.com/cckuailong/simHtml v0.0.0-20200120101524-76ba3d3f7f65
 	github.com/cespare/xxhash/v2 v2.3.0
@@ -130,6 +131,7 @@ require (
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/andygrunwald/go-jira v1.16.0 // indirect
+	github.com/anknown/darts v0.0.0-20151216065714-83ff685239e6 // indirect
 	github.com/antchfx/htmlquery v1.3.0 // indirect
 	github.com/antchfx/xmlquery v1.3.17 // indirect
 	github.com/antchfx/xpath v1.2.4 // indirect
