@@ -230,15 +230,15 @@ func (p *Plugin) Execute(input interface{}) (interface{}, error) {
 					case "p":
 						pValue = value
 					case "hl":
-						if value != "flase" {
+						if value != "false" {
 							hl = true
 						}
 					case "xhr":
-						if value != "flase" {
+						if value != "false" {
 							xhr = true
 						}
 					case "pc":
-						if value != "flase" {
+						if value != "false" {
 							pc = true
 						}
 					case "rs":
